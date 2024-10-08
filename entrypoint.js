@@ -1,10 +1,6 @@
 const axios = require('axios');
 const core = require('@actions/core');
 const github = require('@actions/github');
-const { join } = require('path');
-
-const shouldNotiLine = core.getInput('line');
-const shouldNotiDiscord = core.getInput('discord');
 
 const REQUIRED_ENV_VARS = [
   'GITHUB_EVENT_PATH',
