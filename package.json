@@ -1,24 +1,25 @@
 {
-  "name": "action-discord",
+  "name": "discord-notification",
   "version": "0.2.0",
-  "description": "GitHub Action that sends a Discord notification.",
+  "description": "GitHub Action that sends Discord and notification.",
   "private": true,
   "scripts": {
     "test": "npm test"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tharitm/actions.git"
+    "url": "git+https://github.com/bawop443/action-discord.git"
   },
   "keywords": [
+    "line",
     "discord",
     "github",
     "action"
   ],
-  "author": "Ilshidur",
+  "author": "Bawonsak",
   "license": "MIT",
   "dependencies": {
-    "axios": "0.21.1",
-    "@actions/github": "^6.0.0"
+    "@actions/github": "^6.0.0",
+    "axios": "0.21.1"
   }
 }
