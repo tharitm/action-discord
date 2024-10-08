@@ -30,21 +30,18 @@ REQUIRED_ENV_VARS.forEach(env => {
 const eventPayload = github.context.payload;
 
 console.log("eventPayload: ", JSON.stringify(eventPayload, null, 2))
-console.log("shouldNotiDiscord: ", shouldNotiDiscord)
-console.log("shouldNotiLine: ", shouldNotiLine)
 
-if (shouldNotiDiscord === 'true') {
-  const notiObj = {
-    jobStatus: process.env.GITHUB_JOB_STATUS,
-    workflow: process.env.GITHUB_WORKFLOW,
-    username: process.env.DISCORD_USERNAME,
-    avatarUrl: process.env.DISCORD_AVATAR,
-    eventContent: eventPayload,
-    discordWebhookUrl: process.env.DISCORD_WEBHOOK,
-    additionalDesc: process.env.ADDITIONAL_DESCRIPTION
-  }
-  discordNotify(notiObj)
+const notiObj = {
+  jobStatus: process.env.GITHUB_JOB_STATUS,
+  workflow: process.env.GITHUB_WORKFLOW,
+  username: process.env.DISCORD_USERNAME,
+  avatarUrl: process.env.DISCORD_AVATAR,
+  eventContent: eventPayload,
+  discordWebhookUrl: process.env.DISCORD_WEBHOOK,
+  additionalDesc: process.env.ADDITIONAL_DESCRIPTION
 }
+
+discordNotify(notiObj)
 
 async function discordNotify({ jobStatus, workflow, username, avatarUrl, eventContent, discordWebhookUrl, additionalDesc }) {
   let color
@@ -72,13 +69,13 @@ async function discordNotify({ jobStatus, workflow, username, avatarUrl, eventCo
   const descriptionObj = JSON.parse(JSON.stringify({
     'Repository': `[${process.env.GITHUB_REPOSITORY}](${eventContent.repository.html_url})`,
     'Workflow': workflow,
-    'Ref name': process.env.GITHUB_REF_NAME
+    'Branch': process.env.GITHUB_REF_NAME
   }))
   const description = getDiscordDescription(Object.assign(descriptionObj, additionalDesc), eventContent)
 
   const payload = {
     username: username || 'Deploy Notification',
-    avatar_url: avatarUrl || 'https://cdn.discordapp.com/attachments/988683025942454312/1268082301942632480/IMG_6667.png?ex=66ab212c&is=66a9cfac&hm=21ce38167bfb7cd41eea5d77a7e0562d47767f35af7eb6ff53a22803ef8883f4&',
+    avatar_url: avatarUrl || 'https://cdn.discordapp.com/attachments/1201398363908751401/1293109723788214333/image.png?ex=67062dc6&is=6704dc46&hm=05be4b2708cae7cefb0b8111582807a6debfb7f0e1e9f5ac3750926637d8f29c&',
     embeds: [
       {
         author: {
