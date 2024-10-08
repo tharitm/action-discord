@@ -14,4 +14,14 @@ jobs:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEB_HOOK }}
         DISCORD_USERNAME: GEORGIE
       uses: tharitm/action-discord@master
-
+   notify:
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: always()
+    steps:
+      - name: notification
+        uses: tharitm/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEB_HOOK }}
+          GITHUB_JOB_STATUS: ${{ needs.build.result }}
+          DISCORD_USERNAME: GEORGE
