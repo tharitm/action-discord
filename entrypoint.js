@@ -10,7 +10,8 @@ const REQUIRED_ENV_VARS = [
   'GITHUB_ACTION',
   'DISCORD_WEBHOOK',
   'GITHUB_JOB_STATUS',
-  'GITHUB_RUN_ID'
+  'GITHUB_RUN_ID',
+  'GITHUB_CUSTOM_COMMIT'
 ];
 
 REQUIRED_ENV_VARS.forEach(env => {
@@ -33,12 +34,13 @@ const notiObj = {
   avatarUrl: process.env.DISCORD_AVATAR,
   eventContent: eventPayload,
   discordWebhookUrl: process.env.DISCORD_WEBHOOK,
-  additionalDesc: process.env.ADDITIONAL_DESCRIPTION
+  additionalDesc: process.env.ADDITIONAL_DESCRIPTION,
+  commits: process.env.GITHUB_CUSTOM_COMMIT
 }
 
 discordNotify(notiObj)
 
-async function discordNotify({ jobStatus, workflow, username, avatarUrl, eventContent, discordWebhookUrl, additionalDesc }) {
+async function discordNotify({ jobStatus, workflow, username, avatarUrl, eventContent, discordWebhookUrl, additionalDesc , commits }) {
   let color
   let title
   if (jobStatus == "success") {
@@ -66,7 +68,7 @@ async function discordNotify({ jobStatus, workflow, username, avatarUrl, eventCo
     'Workflow': workflow,
     'Branch': process.env.GITHUB_REF_NAME
   }))
-  const description = getDiscordDescription(Object.assign(descriptionObj, additionalDesc), eventContent)
+  const description = getDiscordDescription(Object.assign(descriptionObj, additionalDesc), eventContent , commits)
 
   const payload = {
     username: username || 'Deploy Notification',
@@ -109,16 +111,19 @@ async function discordNotify({ jobStatus, workflow, username, avatarUrl, eventCo
   }
 }
 
-function getDiscordDescription(descriptionObj, eventContent) {
+function getDiscordDescription(descriptionObj, eventContent, commits) {
   let description = ''
   for (const key of Object.keys(descriptionObj)) {
     description += `**${key}**: ${descriptionObj[key]}\n\n`
   }
+
   if (eventContent.commits?.length) {
     description += `**Commit**: [${eventContent.commits?.length} new commits](${eventContent.compare})\n`
     for (let i = 0; i < 5 && i < eventContent.commits.length; i++) {
       description += `- [\`${eventContent.commits[i].id.slice(0, 7)}\`](${eventContent.commits[i].url}) ${eventContent.commits[i].message} - ${eventContent.commits[i].author?.username || eventContent.commits[i].committer?.username}\n`
     }
+  } else {
+    description += commits
   }
   return description
 }
