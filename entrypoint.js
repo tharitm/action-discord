@@ -1,7 +1,10 @@
 const axios = require('axios');
-const fs = require('fs');
-const _ = require('lodash');
-const { argv } = require('yargs');
+const core = require('@actions/core');
+const github = require('@actions/github');
+const { join } = require('path');
+
+const shouldNotiLine = core.getInput('line');
+const shouldNotiDiscord = core.getInput('discord');
 
 const REQUIRED_ENV_VARS = [
   'GITHUB_EVENT_PATH',
@@ -10,10 +13,10 @@ const REQUIRED_ENV_VARS = [
   'GITHUB_ACTOR',
   'GITHUB_EVENT_NAME',
   'GITHUB_ACTION',
-  'DISCORD_WEBHOOK'
+  'DISCORD_WEBHOOK',
+  'GITHUB_JOB_STATUS',
+  'GITHUB_RUN_ID'
 ];
-
-process.env.GITHUB_ACTION = process.env.GITHUB_ACTION || '<missing GITHUB_ACTION env var>';
 
 REQUIRED_ENV_VARS.forEach(env => {
   if (!process.env[env] || !process.env[env].length) {
@@ -24,59 +27,106 @@ REQUIRED_ENV_VARS.forEach(env => {
   }
 });
 
-const eventContent = fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8');
+const eventPayload = github.context.payload;
 
-_.templateSettings.interpolate = /{{([\s\S]+?)}}/g;
+console.log("eventPayload: ", JSON.stringify(eventPayload, null, 2))
+console.log("shouldNotiDiscord: ", shouldNotiDiscord)
+console.log("shouldNotiLine: ", shouldNotiLine)
 
-let url;
-let payload;
-
-if (argv._.length === 0 && !process.env.DISCORD_EMBEDS) {
-  // If argument and embeds NOT provided, let Discord show the event informations.
-  url = `${process.env.DISCORD_WEBHOOK}/github`;
-  payload = JSON.stringify(JSON.parse(eventContent));
-} else {
-  // Otherwise, if the argument or embeds are provided, let Discord override the message.
-  const args = argv._.join(' ');
-  const message = _.template(args)({ ...process.env, EVENT_PAYLOAD: JSON.parse(eventContent) });
-
-  let embedsObject;
-  if (process.env.DISCORD_EMBEDS) {
-     try {
-        embedsObject = JSON.parse(process.env.DISCORD_EMBEDS);
-     } catch (parseErr) {
-       console.error('Error parsing DISCORD_EMBEDS :' + parseErr);
-       process.exit(1);
-     }
+if (shouldNotiDiscord === 'true') {
+  const notiObj = {
+    jobStatus: process.env.GITHUB_JOB_STATUS,
+    workflow: process.env.GITHUB_WORKFLOW,
+    username: process.env.DISCORD_USERNAME,
+    avatarUrl: process.env.DISCORD_AVATAR,
+    eventContent: eventPayload,
+    discordWebhookUrl: process.env.DISCORD_WEBHOOK,
+    additionalDesc: process.env.ADDITIONAL_DESCRIPTION
   }
-
-  url = process.env.DISCORD_WEBHOOK;
-  payload = JSON.stringify({
-    content: message,
-    ...process.env.DISCORD_EMBEDS && { embeds: embedsObject },
-    ...process.env.DISCORD_USERNAME && { username: process.env.DISCORD_USERNAME },
-    ...process.env.DISCORD_AVATAR && { avatar_url: process.env.DISCORD_AVATAR },
-  });
+  discordNotify(notiObj)
 }
 
-// curl -X POST -H "Content-Type: application/json" --data "$(cat $GITHUB_EVENT_PATH)" $DISCORD_WEBHOOK/github
+async function discordNotify({ jobStatus, workflow, username, avatarUrl, eventContent, discordWebhookUrl, additionalDesc }) {
+  let color
+  let title
+  if (jobStatus == "success") {
+    title = "Action is successful."
+    color = "5162540"
+  } else if (jobStatus == "failure") {
+    title = "Action has failed."
+    color = "16711680"
+  } else if (jobStatus == "cancelled") {
+    title = "Action is cancelled."
+    color = "8421504"
+  } else {
+    title = `Action is ${jobStatus}.`
+  }
 
-(async () => {
-  console.log('Sending message ...');
-  await axios.post(
-    `${url}?wait=true`,
-    payload,
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-GitHub-Event': process.env.GITHUB_EVENT_NAME,
+  try {
+    additionalDesc = JSON.parse(additionalDesc)
+  } catch (error) {
+    console.log("parse ADDITIONAL_DESCRIPTION error: ", error)
+    additionalDesc = {}
+  }
+
+  const descriptionObj = JSON.parse(JSON.stringify({
+    'Repository': `[${process.env.GITHUB_REPOSITORY}](${eventContent.repository.html_url})`,
+    'Workflow': workflow,
+    'Ref name': process.env.GITHUB_REF_NAME
+  }))
+  const description = getDiscordDescription(Object.assign(descriptionObj, additionalDesc), eventContent)
+
+  const payload = {
+    username: username || 'Deploy Notification',
+    avatar_url: avatarUrl || 'https://cdn.discordapp.com/attachments/988683025942454312/1268082301942632480/IMG_6667.png?ex=66ab212c&is=66a9cfac&hm=21ce38167bfb7cd41eea5d77a7e0562d47767f35af7eb6ff53a22803ef8883f4&',
+    embeds: [
+      {
+        author: {
+          name: eventContent.sender?.login || process.env.GITHUB_ACTOR,
+          url: eventContent.sender?.html_url,
+          icon_url: eventContent.sender?.avatar_url
+        },
+        color: color,
+        title: title,
+        url: `${eventContent.repository.html_url}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+        description: description
+      }
+    ]
+  }
+
+  console.log("payload", JSON.stringify(payload, null, 2))
+
+  try {
+    console.log('Sending message ...');
+    await axios.post(
+      `${discordWebhookUrl}?wait=true`,
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        },
       },
-    },
-  );
-  console.log('Message sent ! Shutting down ...');
-  process.exit(0);
-})().catch(err => {
-  console.error('Error :', err.response.status, err.response.statusText);
-  console.error('Message :', err.response ? err.response.data : err.message);
-  process.exit(1);
-});
+    );
+    console.log('Message sent ! Shutting down ...');
+    process.exit(0);
+  } catch (error) {
+    console.error('Error :', error.response.status, error.response.statusText);
+    console.error('Full Error: ', error)
+    console.error('Message :', error.response ? error.response.data : error.message);
+    process.exit(1);
+  }
+}
+
+function getDiscordDescription(descriptionObj, eventContent) {
+  let description = ''
+  for (const key of Object.keys(descriptionObj)) {
+    description += `**${key}**: ${descriptionObj[key]}\n\n`
+  }
+  if (eventContent.commits?.length) {
+    description += `**Commit**: [${eventContent.commits?.length} new commits](${eventContent.compare})\n`
+    for (let i = 0; i < 5 && i < eventContent.commits.length; i++) {
+      description += `- [\`${eventContent.commits[i].id.slice(0, 7)}\`](${eventContent.commits[i].url}) ${eventContent.commits[i].message} - ${eventContent.commits[i].author?.username || eventContent.commits[i].committer?.username}\n`
+    }
+  }
+  return description
+}
