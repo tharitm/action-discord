@@ -1,5 +1,4 @@
 const axios = require('axios');
-const core = require('@actions/core');
 const github = require('@actions/github');
 
 const REQUIRED_ENV_VARS = [
