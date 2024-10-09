@@ -7,7 +7,7 @@ branding:
 inputs:
   args:
     description: 'The message to display in the Discord message.'
-    required: true
+    required: false
 runs:
   using: 'docker'
   image: 'Dockerfile'
